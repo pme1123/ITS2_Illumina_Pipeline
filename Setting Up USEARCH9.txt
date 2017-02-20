@@ -1,0 +1,38 @@
+# Currently, MSI has USEARCH version 8.1.1756. The current pipeline is for version 9.2, which you can add to your home directory.
+
+# I (Patrick) have downloaded USEARCH 9.2 and put it in a folder called "Programs" in my directory. If you're part of the jordannr lab group, 
+# you can add it to your user profile to access it from the command line. If you're not part of the jordannr lab group, download it yourself
+# follow the directions for adding it to your path.
+
+########################
+# For lab group members:
+nano ~/.profile  # open the `.profile` configuration file in nano text editor
+
+# at the bottom of the file, add the following lines:
+if [ -d "/home/jordannr/ewing069/Programs" ] ; then
+        PATH="$PATH:/home/jordannr/ewing069/Programs"
+fi
+
+# Save and exit.
+# test by typing:
+usearch9  # to distinguish from usearch8.1, which is already available on MSI but lacks some features.
+
+########################
+# For non-lab group members:
+# From your terminal (unix, requires `rsync`)
+rsync -e ssh -avz local_path_to/usearch username@login.msi.umn.edu:/home/group/username
+# For windows, use `scp`. See MSI FAQs: https://www.msi.umn.edu/support/faq/support/faq/how-do-i-use-winscp-transfer-data
+
+# Then, ssh in to MSI
+# Add the path to usearch to your $PATH so you can execute it
+nano ~/.profile  # edit your .profile configuration file
+# Add the following to the end of the file
+if [ -d "$HOME/path_to_usearch" ] ; then
+        PATH="$PATH:$HOME/path_to_usearch"
+fi
+
+# make it executable
+cd ~/path_to_usearch
+# rename if desired
+mv old_usearch_name new_usearch_name
+chown 770 new_usearch_name  # gives entire group permissions to read/write/execute.
