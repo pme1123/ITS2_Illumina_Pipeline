@@ -36,13 +36,13 @@ DOC
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-WORKINGDIR="~/bmgc_sequences/PZM_TEST"  # A copy of your raw reads should be in this directory, to make sure you don't overwrite them
-FASTQC_OUT="FASTQC"
+WORKINGDIR=~/bmgc_sequences/PZM_TEST  # A copy of your raw reads should be in this directory, to make sure you don't overwrite them
+FASTQC_OUT=FASTQC
 
-cd "${WORKINGDIR}"
-mkdir "${FASTQC_OUT}"
+cd ${WORKINGDIR}
+mkdir ${FASTQC_OUT}
 module load fastqc  # UMN MSI command
-fastqc "*.fastq" -o "${FASTQC_OUT}" -q
+fastqc *.fastq -o ${FASTQC_OUT} -q
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
@@ -82,23 +82,23 @@ MAXDIFFS=7    # Maximum differences to accept. Higher increases number of merges
 TRUNCTAIL=25  # Minimum quality score of a base at which to truncate. Higher increases
 
 # Make directories for your new, merged reads
-mkdir "./merged"
-mkdir "./merged/stats"
+mkdir ./merged
+mkdir ./merged/stats
 
 #in raw reads file
 #rename files to sample names and merge pairs
-for f in "*_R1_*.fastq"; do
+for f in *_R1_*.fastq; do
   # Pull identifying parts of each file name. See http://tldp.org/LDP/abs/html/string-manipulation.html for string manipulation
-  id="${f%%_*}"    # unique part of each sample (excluding _*.fastq). This returns everything before the first "_". Current setup should work well for UMN BMGC illumina sequences.
+  id=${f%%_*}    # unique part of each sample (excluding _*.fastq). This returns everything before the first "_". Current setup should work well for UMN BMGC illumina sequences.
 
   # See http://www.drive5.com/usearch/manual/cmd_fastq_mergepairs.html
-  usearch9 -fastq_mergepairs "${id}*_R1*.fastq" \
-    -fastqout "./merged/${id}_merged.fastq" \
-    -relabel "${id}." \
-    -log "./merged/stats/${id}_merge.log" \
+  usearch9 -fastq_mergepairs ${id}*_R1*.fastq \
+    -fastqout ./merged/${id}_merged.fastq \
+    -relabel ${id}. \
+    -log ./merged/stats/${id}_merge.log \
     -fastq_nostagger \
-    -fastq_maxdiffs "${MAXDIFFS}" \
-    -fastq_trunctail "${TRUNCTAIL}" # the relabel flag changes fastq labels from jibberish to $id.readnumber
+    -fastq_maxdiffs ${MAXDIFFS} \
+    -fastq_trunctail ${TRUNCTAIL} # the relabel flag changes fastq labels from jibberish to $id.readnumber
 
   done
 
@@ -155,10 +155,10 @@ mkdir trimmed
 
 # trims 5' and 3' ends of each sequence and saves the resulting file as {ID}_trimmed.fastq in $WORKINGDIR/trimmed.
 for f in merged/*.fastq; do
-  id="${f#*/}"
-  id="${id%_*}"
-  usearch9 -fastx_truncate "$f" -stripleft ${LLENGTH} -stripright ${RLENGTH} \
-    -fastqout "./trimmed/${id}_trimmed.fastq"
+  id=${f#*/}
+  id=${id%_*}
+  usearch9 -fastx_truncate $f -stripleft ${LLENGTH} -stripright ${RLENGTH} \
+    -fastqout ./trimmed/${id}_trimmed.fastq
   done
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
@@ -201,9 +201,9 @@ for f in trimmed/*trimmed.fastq; do
   id=${f#*/}
   id=${id%_*}
   usearch9 -fastq_filter $f -fastq_maxee ${EMAX} \
-    -fastaout "./filtered/${id}_filtered.fasta" \
-    -fastaout_discarded "./filtered/discarded/${id}_discarded.fasta" \
-	-log "./filtered/stats/${id}_filter.log"
+    -fastaout ./filtered/${id}_filtered.fasta \
+    -fastaout_discarded ./filtered/discarded/${id}_discarded.fasta \
+	-log ./filtered/stats/${id}_filter.log
   done
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
@@ -241,11 +241,11 @@ $MIN_COUNT=1      # minimum number of occurrances allowed. 2 removes singletons.
 
 ##Concatenate all fasta files into a single file #####
 mkdir reads
-cat "./filtered/*.fasta" > "./reads/reads.fasta"  # places in $WORKINGDIR
+cat ./filtered/*.fasta > ./reads/reads.fasta  # places in $WORKINGDIR
 
 ## Run fastx_uniques
-usearch9 -fastx_uniques "./reads/reads.fasta"  \
-    -fastaout "./reads/uniques.fasta/"          \
+usearch9 -fastx_uniques ./reads/reads.fasta  \
+    -fastaout ./reads/uniques.fasta/          \
     -sizeout        #important!                       \
     -relabel Uniq                          \
 
@@ -314,12 +314,12 @@ DOC
 ALPHA=2 # higher tends to increase number of clusters (and accepted sequences); lower decreases.
 MINAMP=4 # lower increases number of clusters, but has an inconsistent effect on accepted sequences.
 
-mkdir "./denoised"
+mkdir ./denoised
 
-usearch9 -unoise2 "./reads/uniques.fasta" \
+usearch9 -unoise2 ./reads/uniques.fasta \
   -unoise_alpha ${ALPHA} \
   -minampsize ${MINAMP} \
-  -fastaout "./denoised/unoise_defaults.fasta"
+  -fastaout ./denoised/unoise_defaults.fasta
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
@@ -339,13 +339,14 @@ DOC
 ######################################################################################################
 ############                                                                      ####################
 ############                  DENOISING APPROACH 2: OTU CLUSTERING                ####################
+############                         AND READ ASSIGNMENT                          ####################
 ############                                                                      ####################
 ######################################################################################################
 ######################################################################################################
 : <<DOC
 Alternatively to the UNOISE approach is the 97% sequence similarity approach, which is more defensible. Uses
-the `cluster_otus` command. The algorithm favors OTU centers around high-frequency reads and removes chimeras
-in the process. 
+the `-cluster_otus` command. The algorithm favors OTU centers around high-frequency reads and removes 
+chimeras in the process. 
 
 Critical parameters:
   -minsize N, minimum read count to ID OTUs. Set 2 to discard singletons.
@@ -357,60 +358,44 @@ Others are available. See documentation http://drive5.com/usearch/manual/cmd_clu
   - parsimony score options
   - alignment parameters
   - hueristics 
-  
-OTU clustering is followed by assigning reads to OTUs, using the -usearch_global command. This requires a database, such as the one from UNITE 
-(2016-11-20 (ver. 7.1): https://unite.ut.ee/sh_files/utax_reference_dataset_20.11.2016.zip)
 
+Then predict taxonomy using UTAX
+Then run `-usearch_global` to assign all but singletons to OTUs. This requires representative sequences, such
+as from the UNITE database. See the script, 'Make ITS2 Unite Database.sh'. The parameters here are
 
 DOC
-
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 #variables
 MINSIZE=2
 
-mkdir "./denoised"
+mkdir ./denoised
 
-usearch9 -cluster_otus "./reads/uniques.fasta" \
+usearch9 -cluster_otus ./reads/uniques.fasta \
   -minsize ${MINSIZE} \
-  -otus "./denoised/uparse_defaults.fasta" \
-  -uparseout "./denoised/uparse_defaults.txt"  
+  -otus ./denoised/uparse_defaults.fasta \
+  -uparseout ./denoised/uparse_defaults.txt  
   
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
-
 : <<DOC
 
-00:01 48Mb    100.0% 56 OTUs, 34 chimeras
+00:01 48Mb    100.0% 56 OTUs, 34 chimeras  # from -cluster_otus
 
 DOC
-
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-#Download the unite database from USEARCH (pre-sorted)
-DB_URL="http://drive5.com/utax/data/utax_unite_v7.tar.gz"
-TARGET="its2"
-VERSION=7
-
-mkdir "UNITE"
-cd "UNITE"
-
-wget "${DB_URL}"
-tar -xvz *.tar.gz
-rm *.tar.gz
-cd ..
-usearch9 -makeudb_utax ./UNITE/utaxref/unite_v${VERSION}/fasta/refdb.fa \
-  -output ./UNITE/${TARGET}_ref.udb \
-  -taxconfsin ./UNITE/utaxref/unite_v${VERSION}/taxconfs/${TARGET}.tc \
-  -report ./UNITE/${TARGET}_report.txt
 
 ######################################################################################################
 ######################################################################################################
 ############                                                                      ####################
-############                             ASSIGN TAXONOMY                          ####################
+############                            ASSIGN READS TO OTUS                      ####################
 ############                                                                      ####################
 ######################################################################################################
 ######################################################################################################
+: <<DOC
 
+
+DOC
 #assign taxonomy to denoised otus - I want to use my taxonomy-assigned otus as my database for mapping reads to otus.
 #make taxonomy databases for sintax ITS and 16S
 usearch -makeudb_sintax utax_reference_dataset_22.08.2016.fasta -output unite_ITS.udb
