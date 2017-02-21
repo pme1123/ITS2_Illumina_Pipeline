@@ -62,70 +62,62 @@ ssh://USER@login.msi.umn.edu/home/GROUP/USER/${WORKINGDIR}/${FASTQC_OUT}
 The -fastq_mergepairs command does the following:
     - Merges reads into a single read
     - Trims primers and adapters
+Documentation: http://www.drive5.com/usearch/manual/cmd_fastq_mergepairs.html
 
 Important flags are below. See http://drive5.com/usearch/manual/merge_options.html
     -log <path>, a directory for pushing log files. Same as -report?
     -fastq_nostagger, since I have 250bp reads and a 400bp target length, sequences should not stagger
     -fastq_maxdiffs, maximum number of mismatches, defaults 5, higher is OK if you have a long overlap (but what does that mean?)
     -fastq_trunctail #, discards reads at the first base with a quality score <= #, default 2, higher often improves merging. Set it based on QC data from fastqc.
-    -relabel ABC, for relabelling samples using something human-readable. The operator, @,  provides a nice default (-relabel @ ).
+    -relabel ABC, for relabelling samples using something human-readable. The operator, @,  provides a nice default (-relabel @ ). It truncates at the first underscore adds a (.) to separate, and a number as read count.
 
 USEARCH will spit out some logs as it runs, as well. See the mediocre documentation at http://drive5.com/usearch/manual/merge_report.html
 
+In practice this step isn't so important for generating OTUs taxa as long as error rates are held low and >65% of reads can be merged. Maxing out read count increases discarding later and chimera flagging rates, anyway. 
 DOC
 
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 # Variables. Also be sure to check the id variable below. Default should work in most cases.
-MAXDIFFS=7    # Maximum differences to accept. Higher increases number of merges. Error rates will be taken care of in the filtering steps, so feel free to raise this.
-TRUNCTAIL=25  # Minimum quality score of a base at which to truncate. Higher increases
+MAXDIFFS=10    # Maximum differences to accept. Higher increases number of merges. Error rates will be taken care of in the filtering steps, so feel free to raise this.
+TRUNCTAIL=20  # Minimum quality score of a base at which to truncate. Higher increases merges (be reducing mismatches). Not necessarily good... watch mean expected errors and alignment length
+MERGED_OUT="PZM_TEST"
 
 # Make directories for your new, merged reads
 mkdir ./merged
 mkdir ./merged/stats
 
-#in raw reads file
-#rename files to sample names and merge pairs
-for f in *_R1_*.fastq; do
-  # Pull identifying parts of each file name. See http://tldp.org/LDP/abs/html/string-manipulation.html for string manipulation
-  id=${f%%_*}    # unique part of each sample (excluding _*.fastq). This returns everything before the first "_". Current setup should work well for UMN BMGC illumina sequences.
+usearch9 -fastq_mergepairs *_R1*.fastq \
+  -fastqout ./merged/${MERGED_OUT}_merged.fastq \
+  -relabel @ \
+  -log ./merged/stats/${MERGED_OUT}_merge.log \
+  -fastq_nostagger \
+  -fastq_maxdiffs ${MAXDIFFS} \
+  -fastq_trunctail ${TRUNCTAIL} # the relabel flag changes fastq labels from jibberish to $id.readnumber
 
-  # See http://www.drive5.com/usearch/manual/cmd_fastq_mergepairs.html
-  usearch9 -fastq_mergepairs ${id}*_R1*.fastq \
-    -fastqout ./merged/${id}_merged.fastq \
-    -relabel ${id}. \
-    -log ./merged/stats/${id}_merge.log \
-    -fastq_nostagger \
-    -fastq_maxdiffs ${MAXDIFFS} \
-    -fastq_trunctail ${TRUNCTAIL} # the relabel flag changes fastq labels from jibberish to $id.readnumber
-
-  done
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 : <<DOC
-Example Output:
-
-00:02 83Mb    100.0% 87.0% merged  # incidentally, this is ~ the percentage of sequences that have my primers.
+00:01 83Mb    100.0% 81.0% merged
 
 Totals:
      43259  Pairs (43.3k)
-     37620  Merged (37.6k, 86.96%)
-      7692  Alignments with zero diffs (17.78%)
-      5045  Too many diffs (> 7) (11.66%)
-      7655  Fwd tails Q <= 25 trimmed (17.70%)
-     41109  Rev tails Q <= 25 trimmed (95.03%)
-         0  Fwd too short (< 64) after tail trimming (0.00%)
-         3  Rev too short (< 64) after tail trimming (0.01%)
-       569  No alignment found (1.32%)
+     35035  Merged (35.0k, 80.99%)
+      2464  Alignments with zero diffs (5.70%)
+      7720  Too many diffs (> 10) (17.85%)
+      3260  Fwd tails Q <= 20 trimmed (7.54%)
+     35758  Rev tails Q <= 20 trimmed (82.66%)
+       482  No alignment found (1.11%)
          0  Alignment too short (< 16) (0.00%)
         22  Staggered pairs (0.05%) discarded
-    162.79  Mean alignment length
-    404.38  Mean merged length
-      0.60  Mean fwd expected errors
-      6.45  Mean rev expected errors
-      0.12  Mean merged expected errors
+    180.70  Mean alignment length
+    404.31  Mean merged length
+      0.52  Mean fwd expected errors
+      6.16  Mean rev expected errors
+      0.10  Mean merged expected errors  # awesome.
+
 DOC
 
 ######################################################################################################
@@ -154,14 +146,16 @@ RLENGTH=20  # 3' primer length
 mkdir trimmed
 
 # trims 5' and 3' ends of each sequence and saves the resulting file as {ID}_trimmed.fastq in $WORKINGDIR/trimmed.
-for f in merged/*.fastq; do
-  id=${f#*/}
-  id=${id%_*}
-  usearch9 -fastx_truncate $f -stripleft ${LLENGTH} -stripright ${RLENGTH} \
-    -fastqout ./trimmed/${id}_trimmed.fastq
-  done
-
+usearch9 -fastx_truncate ./merged/${MERGED_OUT}_merged.fastq \
+  -stripleft ${LLENGTH} \
+  -stripright ${RLENGTH} \
+  -fastqout ./merged/${MERGED_OUT}_trimmed.fastq
+  
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+#
+# 00:01 37Mb    100.0% Processing, 0 (0.0%) too short
+#
 
 ######################################################################################################
 ######################################################################################################
@@ -192,28 +186,25 @@ DOC
 EMAX=1.0  # 1.0 is recommended.
 
 # Make new directories for QC filtered
-mkdir filtered
-mkdir filtered/stats
-mkdir filtered/discarded
+mkdir merged/stats
+mkdir merged/discarded
 
 # Filter for quality control using -fastq_filter command http://www.drive5.com/usearch/manual/cmd_fastq_filter.html
-for f in trimmed/*trimmed.fastq; do
-  id=${f#*/}
-  id=${id%_*}
-  usearch9 -fastq_filter $f -fastq_maxee ${EMAX} \
-    -fastaout ./filtered/${id}_filtered.fasta \
-    -fastaout_discarded ./filtered/discarded/${id}_discarded.fasta \
-	-log ./filtered/stats/${id}_filter.log
-  done
+
+usearch9 -fastq_filter ./merged/${MERGED_OUT}_trimmed.fastq\
+  -fastq_maxee ${EMAX} \
+  -fastaout ./merged/${MERGED_OUT}_filtered.fasta \
+  -fastaout_discarded ./merged/discarded/${MERGED_OUT}_discarded.fasta \
+  -log ./merged/stats/${MERGED_OUT}_filter.log
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 : <<DOC
 # Example Output
-00:02 15Mb    100.0% Filtering, 98.8% passed
-     37620  Reads (37.6k)
-       467  Discarded reads with expected errs > 1.00
-     37153  Filtered reads (37.2k, 98.8%)
+00:01 15Mb    100.0% Filtering, 99.3% passed
+     35035  Reads (35.0k)                   
+       232  Discarded reads with expected errs > 1.00
+     34803  Filtered reads (34.8k, 99.3%)
 DOC
 
 ######################################################################################################
@@ -237,27 +228,23 @@ DOC
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 # Variables
-$MIN_COUNT=1      # minimum number of occurrances allowed. 2 removes singletons.
-
-##Concatenate all fasta files into a single file #####
-mkdir reads
-cat ./filtered/*.fasta > ./reads/reads.fasta  # places in $WORKINGDIR
+$MIN_COUNT=1      # minimum number of occurrances allowed. 2 removes singletons. (not recommended)
 
 ## Run fastx_uniques
-usearch9 -fastx_uniques ./reads/reads.fasta  \
-    -fastaout ./reads/uniques.fasta/          \
-    -sizeout        #important!                       \
-    -relabel Uniq                          \
+usearch9 -fastx_uniques ./merged/${MERGED_OUT}_filtered.fasta \
+    -fastaout ./merged/${MERGED_OUT}_uniques.fasta \
+    -sizeout \
+    -relabel Uniq
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 : <<DOC
 Sample Output:
 
-00:01 107Mb   100.0% DF                       
-00:01 107Mb  37153 seqs, 3973 uniques, 2672 singletons (67.3%)
-00:01 107Mb  Min size 1, median 1, max 18569, avg 9.35
-00:01 102Mb   100.0% Writing reads/uniques.fasta
+00:00 33Mb    100.0% DF                                        
+00:00 34Mb   34803 seqs, 3708 uniques, 2473 singletons (66.7%)
+00:00 34Mb   Min size 1, median 1, max 17529, avg 9.39
+00:00 33Mb    100.0% Writing ./filtered/PZM_TEST_uniques.fasta
 
 DOC
 
@@ -314,12 +301,10 @@ DOC
 ALPHA=2 # higher tends to increase number of clusters (and accepted sequences); lower decreases.
 MINAMP=4 # lower increases number of clusters, but has an inconsistent effect on accepted sequences.
 
-mkdir ./denoised
-
-usearch9 -unoise2 ./reads/uniques.fasta \
+usearch9 -unoise2 ./merged/${MERGED_OUT}_uniques.fasta \
   -unoise_alpha ${ALPHA} \
   -minampsize ${MINAMP} \
-  -fastaout ./denoised/unoise_defaults.fasta
+  -fastaout ./merged/${MERGED_OUT}_unoise_defaults.fasta
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
@@ -328,10 +313,10 @@ Example output:
 00:00 208Mb   100.0% Word stats
 00:00 208Mb   100.0% Alloc rows
 00:00 208Mb   100.0% Build index
-00:01 179Mb   100.0% Reading ./reads/uniques.fasta
-00:01 153Mb   100.0% 94 amplicons, 9984 bad (size >= 4)  # of 37000 seqs; after matching <4 abundances.
-00:01 159Mb   100.0% 94 good, 0 chimeras               
-00:01 159Mb   100.0% Writing amplicons  
+00:00 179Mb   100.0% Reading ./filtered/PZM_TEST_uniques.fasta
+00:00 153Mb   100.0% 93 amplicons, 9201 bad (size >= 4)       
+00:00 159Mb   100.0% 93 good, 0 chimeras               
+00:00 159Mb   100.0% Writing amplicons    
 
 DOC
 
@@ -359,56 +344,131 @@ Others are available. See documentation http://drive5.com/usearch/manual/cmd_clu
   - alignment parameters
   - hueristics 
 
-Then predict taxonomy using UTAX
-Then run `-usearch_global` to assign all but singletons to OTUs. This requires representative sequences, such
-as from the UNITE database. See the script, 'Make ITS2 Unite Database.sh'. The parameters here are
 
 DOC
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-#variables
+#variables for cluster_otus
 MINSIZE=2
 
 mkdir ./denoised
 
-usearch9 -cluster_otus ./reads/uniques.fasta \
+usearch9 -cluster_otus ./merged/${MERGED_OUT}_uniques.fasta \
   -minsize ${MINSIZE} \
-  -otus ./denoised/uparse_defaults.fasta \
-  -uparseout ./denoised/uparse_defaults.txt  
+  -otus ./merged/${MERGED_OUT}_uparse_defaults.fasta \
+  -uparseout ./merged/${MERGED_OUT}_uparse_defaults.txt  
   
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 : <<DOC
 
-00:01 48Mb    100.0% 56 OTUs, 34 chimeras  # from -cluster_otus
+00:01 48Mb    100.0% 54 OTUs, 26 chimeras
 
 DOC
-#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
-
-
 ######################################################################################################
 ######################################################################################################
 ############                                                                      ####################
-############                            ASSIGN READS TO OTUS                      ####################
+############                          ASSIGN TAXONOMY                             ####################
 ############                                                                      ####################
 ######################################################################################################
 ######################################################################################################
 : <<DOC
+Then predict taxonomy using `-utax`. This is a similar algorithm to RDP (naive baysian). It tends to have 
+lower errors, but also lower sensitivity, than other algorithms. According to 
+(Richardson et al, 2016; DOI:10.1111/1755-0998.12628), optimizing the cutoff can increase sensitivity
+without increasing error rates; to do this effectively would require mock datasets. Parameters:
+  -utax_cutoff [0, 1], minimum confidence for keeping a taxa. Default 0.9 (generally recommended; 
+    however, decreasing to 0.65 might give better results).
+  -db ABC.udb, database performed by the makeudb_utax command, see Make ITS2 Unite Database.sh
+  -strand {}, options "plus" or "both". Both searches both forward and reverse-compliments. Plus is 
+    only forward.
+  -id [0, 1], matching OTUs. 97% (0.97) recommended.
+  -rdpout PATH, for an output file in RDP format
+DOC
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
+#variables for -utax
+CUTOFF=0.90 #0.9 default; recommended. 
+STRAND="both"
+MATCH_ID=0.97
+
+PATH_TO_DB=./UNITE/UNITEv7_its2_ref.udb
+#PATH_TO_CLUSTERS=./denoised/unoise_defaults.fasta
+NAME_OUT=${MERGED_OUT}"_uparse_"${CUTOFF}  # string identifying the output .utax and .txt files
+
+
+usearch9 -utax ./merged/${MERGED_OUT}_uparse_defaults.fasta \
+  -db ${PATH_TO_DB} \
+  -strand ${STRAND} \
+  -id ${MATCH_ID} \
+  -utax_cutoff ${CUTOFF} \
+  -utaxout ./merged/${NAME_OUT}_OTUs.utax \
+  -alnout ./merged/${NAME_OUT}_alignment.txt
+  
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#  
+: <<DOC
+
+00:00 212Mb   100.0% 54 seqs, 64.8% at phylum, 9.3% genus (P > 0.90)  # uparse method
+00:00 212Mb   100.0% 93 seqs, 30.1% at phylum, 4.3% genus (P > 0.90)  # unoise method 
+
+00:00 212Mb   100.0% 54 seqs, 64.8% at phylum, 33.3% genus (P > 0.65)  # uparse method
+00:00 212Mb   100.0% 93 seqs, 30.1% at phylum, 17.2% genus (P > 0.65)  # unoise method
+
+Overall, uparse matches a higher percentage but also has fewer OTUs:
+  UNOISE has 93 OTUs
+  UPARSE has 54 OTUs
+Therefore, in terms of absolute matches, the methods are equivalent. Plus, regardless of cutoff or method,
+I find 9 matches to Glomeromycota
 
 DOC
-#assign taxonomy to denoised otus - I want to use my taxonomy-assigned otus as my database for mapping reads to otus.
-#make taxonomy databases for sintax ITS and 16S
-usearch -makeudb_sintax utax_reference_dataset_22.08.2016.fasta -output unite_ITS.udb
-usearch -makeudb_sintax rdp_16s_v16_sp.fa -output rdp_16s.udb
 
-#merge fastq reads from before filtering step (merged and renamed, but not filtered)
-cat *fastq > reads.fastq
+######################################################################################################
+######################################################################################################
+############                                                                      ####################
+############                               MAKE OTU TABLE                         ####################
+############                                                                      ####################
+######################################################################################################
+######################################################################################################
+: <<DOC
+Reassign all reads to taxa. This includes singletons, which Edgar argues are often point mutations of legitimate sequences. Reference: http://www.drive5.com/usearch/manual/cmd_usearch_global.html
 
+This uses the `-usearch_global` command. Critical parameters are:
+  -strand {}, options plus or both, for forward or both, respectively.
+  -id NN, for matching sequences. Recommend 0.97.
+  -otutabout PATH.json, for txt file (QIIME format)
+  -biomout PATH.json, for BIOM format which is becoming dominant
+  -mothur_shared_out PATH, for mothur
+  -maxaccepts NN, to increase maximum accepted OTU assignments per sequence beyond 1.
 
-#run sintax algorithm
-usearch -sintax reads.fastq -db unite_ITS.udb -tabbedout allsamples.sintax -strand both -sintax_cutoff 0.8
+The input file should be the trimmed sequences, no quality filtering. If they don't match, they're no good
+anyway. If they're close, they're probably a legitimate error. 
 
+This is the only function that takes a long time (~2 min / 100Mb data per core)
+DOC
 
-#make otu table
-usearch -usearch_global reads.fastq -db denoised.fa -id 0.97 -strand both -otutabout otu_table.txt
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
+#variables
+STRAND="both"
+MATCH_ID=0.97
+
+PATH_TO_DB=./UNITE/UNITEv7_its2_ref.udb
+PATH_TO_CLUSTERS=./merged/${NAME_OUT}_unoise_defaults.fasta
+NAME_OUT="unoise${CUTOFF}"  # string identifying the output .utax and .txt files
+
+mkdir ./merged/OTU_TABLE
+
+usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
+  -db ${PATH_TO_DB} \
+  -strand ${STRAND} \
+  -id ${MATCH_ID} \
+  -log ./merged/OTU_TABLE/${MERGED_OUT}_table_log.txt \
+  -otutabout ./merged/OTU_TABLE/${MERGED_OUT}_table.txt \
+  -biomout ./merged/OTU_TABLE/${MERGED_OUT}_table.json
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+  
+: <<DOC
+01:43 214Mb   100.0% Searching PZM_TEST_trimmed.fastq, 2.2% matched
+784 / 35035 mapped to OTUs (2.2%)    
+
+DOC
