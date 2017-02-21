@@ -1,10 +1,14 @@
 : <<DOC
 
-To run -usearch_global to assign taxa to OTUs, you need an input database of OTUs to match against. This script uses the UNITE database and usearch methods to make the database. 
+To run -utax to assign taxa to OTUs, you need an input database of OTUs to match against. This script uses the UNITE database and usearch methods to make 
+the database. Note that different methods are required to run `-sintax`, which is an alternative (less tested) way of doing the same thing. See 
+http://drive5.com/usearch/manual/utax_or_sintax.html As of writing, neither algorithm is published. Independent analysis 
+(Richardson et al, 2016; DOI:10.1111/1755-0998.12628) shows UTAX is less sensitive than RDP, but also has a lower error rate, for plant ID at the genus 
+level. Larger databases increase match rate for both. This observation agrees withvUSEARCH's documentation: http://drive5.com/usearch/manual/tax_se_its2.html
 
 OTU clustering is followed by assigning reads to OTUs, using the -usearch_global command. This requires a database, such as the one from UNITE.
-(2016-11-20 (ver. 7.1): https://unite.ut.ee/sh_files/utax_reference_dataset_20.11.2016.zip). I recommend downloading the pre-trained dataset from USEARCH's website: 
-http://drive5.com/usearch/manual/utax_downloads.html
+(2016-11-20 (ver. 7.1): https://unite.ut.ee/sh_files/utax_reference_dataset_20.11.2016.zip). I recommend downloading the pre-trained dataset from 
+USEARCH's website: http://drive5.com/usearch/manual/utax_downloads.html
 
 The main -makeudb_utax documentation is at http://drive5.com/usearch/manual/cmd_makeudb_utax.html.
 
