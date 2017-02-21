@@ -7,7 +7,7 @@ Annotated by Patrick Ewing, Jordan Lab, University of Minnesota, February 16, 20
 This is a USearch-based script to process illumina sequencing data for environmental samples. Unfortunately, the
 maximum memory size is 4gb on the free version, which can use up to 24 threads. USEARCH documentation is at http://drive5.com/usearch/manual/uparse_pipeline.html
 
-This is for USEARCH 9.1. MSI currently has USEARCH 8.1 installed, which won't work with this script. See "Setting Up USEARCH9.txt" for access.
+This is for USEARCH 9.2. MSI currently has USEARCH 8.1 installed, which won't work with this script. See "Setting Up USEARCH9.txt" for access.
 
 The current iteration of this script is for the general fungal primers, ITS4 and 5.8SR primers, which target a 400bp fragment of ITS2. Sequences were generated
 on a MiSeq using paired-end reads of 300bp. ~ 80 samples were multiplexed for this. DNA was from corn roots extracted using MoBio's PowerSoil kit.
@@ -74,6 +74,7 @@ USEARCH will spit out some logs as it runs, as well. See the mediocre documentat
 
 DOC
 
+
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 # Variables. Also be sure to check the id variable below. Default should work in most cases.
@@ -81,8 +82,8 @@ MAXDIFFS=7    # Maximum differences to accept. Higher increases number of merges
 TRUNCTAIL=25  # Minimum quality score of a base at which to truncate. Higher increases
 
 # Make directories for your new, merged reads
-mkdir "merged"
-mkdir "merged/stats"
+mkdir "./merged"
+mkdir "./merged/stats"
 
 #in raw reads file
 #rename files to sample names and merge pairs
@@ -92,9 +93,9 @@ for f in "*_R1_*.fastq"; do
 
   # See http://www.drive5.com/usearch/manual/cmd_fastq_mergepairs.html
   usearch9 -fastq_mergepairs "${id}*_R1*.fastq" \
-    -fastqout "merged/${id}_merged.fastq" \
+    -fastqout "./merged/${id}_merged.fastq" \
     -relabel "${id}." \
-    -log "merged/stats/${id}_merge.log" \
+    -log "./merged/stats/${id}_merge.log" \
     -fastq_nostagger \
     -fastq_maxdiffs "${MAXDIFFS}" \
     -fastq_trunctail "${TRUNCTAIL}" # the relabel flag changes fastq labels from jibberish to $id.readnumber
@@ -157,7 +158,7 @@ for f in merged/*.fastq; do
   id="${f#*/}"
   id="${id%_*}"
   usearch9 -fastx_truncate "$f" -stripleft ${LLENGTH} -stripright ${RLENGTH} \
-    -fastqout "trimmed/${id}_trimmed.fastq"
+    -fastqout "./trimmed/${id}_trimmed.fastq"
   done
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
@@ -200,9 +201,9 @@ for f in trimmed/*trimmed.fastq; do
   id=${f#*/}
   id=${id%_*}
   usearch9 -fastq_filter $f -fastq_maxee ${EMAX} \
-    -fastaout filtered/${id}_filtered.fasta \
-    -fastaout_discarded filtered/discarded/${id}_discarded.fasta \
-	-log filtered/stats/${id}_filter.log
+    -fastaout "./filtered/${id}_filtered.fasta" \
+    -fastaout_discarded "./filtered/discarded/${id}_discarded.fasta" \
+	-log "./filtered/stats/${id}_filter.log"
   done
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
@@ -224,51 +225,183 @@ DOC
 ######################################################################################################
 
 : <<DOC
-Now it's time to count unique sequences. USEARCH recommends doing this on the entire run of related samples. This
-facilitates downstream filtering:
-- singletons
-- chimeras
--
+Now it's time to count unique sequences. USEARCH recommends doing this on the entire run of related samples. This facilitates downstream filtering.
+
+Critical parameters:
+  -sizeout, says that size annotations should be added
+  -relable "ABC", relabel sequences as ABC#
+  -minuniquesize, sets minimum abundance. Default 1; will be taken care of later.
+  -tabbedout $PATH, produces a txt file with columns as output.
 DOC
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 # Variables
 $MIN_COUNT=1      # minimum number of occurrances allowed. 2 removes singletons.
 
-##### Concatenate all fasta files into a single file #####
+##Concatenate all fasta files into a single file #####
 mkdir reads
+cat "./filtered/*.fasta" > "./reads/reads.fasta"  # places in $WORKINGDIR
 
-cat filtered/*.fasta > reads/reads.fasta  # places in $WORKINGDIR
-
-usearch9 -fastx_uniques reads/reads.fasta  \
-    -fastaout reads/uniques.fasta          \
-    -sizeout                               \
+## Run fastx_uniques
+usearch9 -fastx_uniques "./reads/reads.fasta"  \
+    -fastaout "./reads/uniques.fasta/"          \
+    -sizeout        #important!                       \
     -relabel Uniq                          \
 
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-##### Find unique sequences and tabulate abundance for each unique sequence #####
-usearch -fastx_uniques reads.fasta -fastaout uniques.fasta -sizeout
-# Documentation: http://www.drive5.com/usearch/manual/cmd_fastx_uniques.html
+: <<DOC
+Sample Output:
 
-#stats for cedar creek fungi
-#00:14 1.2Gb   100.0% Reading reads.fasta
-#00:23 1.3Gb   100.0% DF
-#00:23 1.4Gb  4171086 seqs, 890625 uniques, 715745 singletons (80.4%)
-#00:23 1.4Gb  Min size 1, median 1, max 108294, avg 4.68
-#00:43 1.3Gb   100.0% Writing uniques.fasta
+00:01 107Mb   100.0% DF                       
+00:01 107Mb  37153 seqs, 3973 uniques, 2672 singletons (67.3%)
+00:01 107Mb  Min size 1, median 1, max 18569, avg 9.35
+00:01 102Mb   100.0% Writing reads/uniques.fasta
+
+DOC
 
 ######################################################################################################
 ######################################################################################################
 ############                                                                      ####################
-############                     REMOVE MISTAKES, SPURRIOUS OTUs                  ####################
+############        DENOISING APPROACH 1: REMOVE MISTAKES, SPURRIOUS OTUs         ####################
 ############                                                                      ####################
 ######################################################################################################
 ######################################################################################################
+: <<DOC
+THIS STEP IS ILLUMINA-SPECIFIC. 
+See http://www.drive5.com/usearch/manual/cmd_unoise2.html
+Now clean up the files and remove errors. The clustering algorithm (for forming "OTUs") works best after pooling, but this does decrease sensitivity to close variants. Recommends trying both before and after
+pooling. The  uses the unoise2 algorithm and performs:
+- sequence error ID and correction
+- chimera removal
+- PhiX removal
+Paper: http://www.biorxiv.org/content/biorxiv/early/2016/10/15/081257.full.pdf
+The basic approach is clustering sequences, then finding a centeroid based on abundance. Edgar calls
+these clusters *ZOTUs* (zero-radius).
 
-# denoise samples - remove sequencing error, chimeras, PhiX. Correct abundances.
-# UNOISE is Illumina-specific. See http://www.drive5.com/usearch/manual/unoise_algo.html
-usearch -unoise2 uniques.fasta -tabbedout out.txt -fastaout denoised.fasta
+Possible flags:
+  -ampout ABC, writes corrected amplicons (including chimeras). Not for downstream analysis
+  -minampsize N, minimum abundnace sequences to feed the algorithm (for identifying clusters). Default 4. These won't be removed completely, however. Pooling means that most likely, only repeat singletons and PCR errors 
+  -unoise_alpha N, critical parameter. Default 2.
 
-#stats
+FIRST
+To make centeroids, the algorithm uses the skew = (seq count / cluster count) and the distance (sequence 
+and centeroid, in differences including indels). These are related through the equation:
+  beta(dist) = 1/2exp(alpha*dist + 1)
+If skew < beta(dist), then more likely than not the sequence is an error of the centeroid, rather than
+a separate cluster.
+As ALPHA increases, beta(dist) decreases, meaning that more sequences are included in the cluster. This
+increases the chance of getting a bad sequence, but also reduces sensitivity to overly small differences
+among clusters. 
+
+SECOND
+The same matching criteria are used on the entire dataset (including reads with counts < -minampsize) to
+reassign sequences to ZOTUs. 
+
+THIRD
+Chimera filtering. Takes parent sequences and query sequences. The parents must have abundances 
+> 2x query, under assumption that they experience an extra PCR cycle (assumes perfect PCR efficiency).
+Lowering this threshold increases 'chimeras' that are removed. This really only becomes an issue for
+high-diversity datasets. Chimeras are detected by setting a max point error threshold introduced by
+sequencing rather than PCR. If E(error) < 1 from the first step, then setting the threshold at 0 should be fine (and in fact, I don't think you can change it here).
+
+DOC
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+# variables
+ALPHA=2 # higher tends to increase number of clusters (and accepted sequences); lower decreases.
+MINAMP=4 # lower increases number of clusters, but has an inconsistent effect on accepted sequences.
+
+mkdir "./denoised"
+
+usearch9 -unoise2 "./reads/uniques.fasta" \
+  -unoise_alpha ${ALPHA} \
+  -minampsize ${MINAMP} \
+  -fastaout "./denoised/unoise_defaults.fasta"
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+: <<DOC
+Example output: 
+00:00 208Mb   100.0% Word stats
+00:00 208Mb   100.0% Alloc rows
+00:00 208Mb   100.0% Build index
+00:01 179Mb   100.0% Reading ./reads/uniques.fasta
+00:01 153Mb   100.0% 94 amplicons, 9984 bad (size >= 4)  # of 37000 seqs; after matching <4 abundances.
+00:01 159Mb   100.0% 94 good, 0 chimeras               
+00:01 159Mb   100.0% Writing amplicons  
+
+DOC
+
+######################################################################################################
+######################################################################################################
+############                                                                      ####################
+############                  DENOISING APPROACH 2: OTU CLUSTERING                ####################
+############                                                                      ####################
+######################################################################################################
+######################################################################################################
+: <<DOC
+Alternatively to the UNOISE approach is the 97% sequence similarity approach, which is more defensible. Uses
+the `cluster_otus` command. The algorithm favors OTU centers around high-frequency reads and removes chimeras
+in the process. 
+
+Critical parameters:
+  -minsize N, minimum read count to ID OTUs. Set 2 to discard singletons.
+  -otu_radius_pct N, for setting sequence similarity = (1-N). Default=3 (for 97%)
+  -otus ABC.fasta, for the output files (FASTA)
+  -uparseout ABC.txt, for text output file
+  -uparsealnout ABC.txt, for alignment of each query to the references.
+Others are available. See documentation http://drive5.com/usearch/manual/cmd_cluster_otus.html
+  - parsimony score options
+  - alignment parameters
+  - hueristics 
+  
+OTU clustering is followed by assigning reads to OTUs, using the -usearch_global command. This requires a database, such as the one from UNITE 
+(2016-11-20 (ver. 7.1): https://unite.ut.ee/sh_files/utax_reference_dataset_20.11.2016.zip)
+
+
+DOC
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+#variables
+MINSIZE=2
+
+mkdir "./denoised"
+
+usearch9 -cluster_otus "./reads/uniques.fasta" \
+  -minsize ${MINSIZE} \
+  -otus "./denoised/uparse_defaults.fasta" \
+  -uparseout "./denoised/uparse_defaults.txt"  
+  
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+: <<DOC
+
+00:01 48Mb    100.0% 56 OTUs, 34 chimeras
+
+DOC
+
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
+
+#Download the unite database from USEARCH (pre-sorted)
+DB_URL="http://drive5.com/utax/data/utax_unite_v7.tar.gz"
+TARGET="its2"
+VERSION=7
+
+mkdir "UNITE"
+cd "UNITE"
+
+wget "${DB_URL}"
+tar -xvz *.tar.gz
+rm *.tar.gz
+cd ..
+usearch9 -makeudb_utax ./UNITE/utaxref/unite_v${VERSION}/fasta/refdb.fa \
+  -output ./UNITE/${TARGET}_ref.udb \
+  -taxconfsin ./UNITE/utaxref/unite_v${VERSION}/taxconfs/${TARGET}.tc \
+  -report ./UNITE/${TARGET}_report.txt
 
 ######################################################################################################
 ######################################################################################################
