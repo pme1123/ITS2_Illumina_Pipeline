@@ -394,9 +394,9 @@ MATCH_ID=0.97
 PATH_TO_DB=./UNITE/UNITEv7_its2_ref.udb
 #PATH_TO_CLUSTERS=./denoised/unoise_defaults.fasta
 NAME_OUT=${MERGED_OUT}"_uparse_"${CUTOFF}  # string identifying the output .utax and .txt files
+METHOD="uparse"
 
-
-usearch9 -utax ./merged/${MERGED_OUT}_uparse_defaults.fasta \
+usearch9 -utax ./merged/${MERGED_OUT}_${METHOD}_defaults.fasta \
   -db ${PATH_TO_DB} \
   -strand ${STRAND} \
   -id ${MATCH_ID} \
@@ -441,8 +441,6 @@ This uses the `-usearch_global` command. Critical parameters are:
 
 The input file should be the trimmed sequences, no quality filtering. If they don't match, they're no good
 anyway. If they're close, they're probably a legitimate error. 
-
-This is the only function that takes a long time (~2 min / 100Mb data per core)
 DOC
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
@@ -451,14 +449,13 @@ DOC
 STRAND="both"
 MATCH_ID=0.97
 
-PATH_TO_DB=./UNITE/UNITEv7_its2_ref.udb
-PATH_TO_CLUSTERS=./merged/${NAME_OUT}_unoise_defaults.fasta
+PATH_TO_OTUS=./merged/${MERGED_OUT}_${METHOD}_defaults.fasta  # from clustering OTUs (UNOISE or UPARSE)
 NAME_OUT="unoise${CUTOFF}"  # string identifying the output .utax and .txt files
 
 mkdir ./merged/OTU_TABLE
 
 usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
-  -db ${PATH_TO_DB} \
+  -db ${PATH_TO_OTUS} \
   -strand ${STRAND} \
   -id ${MATCH_ID} \
   -log ./merged/OTU_TABLE/${MERGED_OUT}_table_log.txt \
@@ -468,7 +465,6 @@ usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
   
 : <<DOC
-01:43 214Mb   100.0% Searching PZM_TEST_trimmed.fastq, 2.2% matched
-784 / 35035 mapped to OTUs (2.2%)    
+00:00 131Mb   100.0% Searching PZM_TEST_trimmed.fastq, 99.5% matched
 
 DOC
