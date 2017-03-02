@@ -15,7 +15,7 @@ DOC
 
 
 # Start your interactive session with mesabi if you want to run this interactively.
-#qsub -I -l nodes=1:ppn=8,mem=8gb,walltime=4:00:00
+#qsub -I -l nodes=1:ppn=16,mem=8gb,walltime=4:00:00
 
 ######################################################################################################
 ######################################################################################################
@@ -36,13 +36,14 @@ DOC
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-WORKINGDIR=~/bmgc_sequences/PZM_TEST  # A copy of your raw reads should be in this directory, to make sure you don't overwrite them
+WORKINGDIR=~/bmgc_sequences/V1_PZM  # A copy of your raw reads should be in this directory, to make sure you don't overwrite them
 FASTQC_OUT=FASTQC
+THREADS=16  # 250mb each. Make sure you've checked out the resources for this first!
 
 cd ${WORKINGDIR}
 mkdir ${FASTQC_OUT}
 module load fastqc  # UMN MSI command
-fastqc *.fastq -o ${FASTQC_OUT} -q
+fastqc *.fastq -o ${FASTQC_OUT} -t $THREADS #16 threads, 250mb RAM each. 
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
@@ -68,6 +69,7 @@ Important flags are below. See http://drive5.com/usearch/manual/merge_options.ht
     -log <path>, a directory for pushing log files. Same as -report?
     -fastq_nostagger, since I have 250bp reads and a 400bp target length, sequences should not stagger
     -fastq_maxdiffs, maximum number of mismatches, defaults 5, higher is OK if you have a long overlap (but what does that mean?)
+    -fastq_maxdiffpct, same as fastq_maxdiffs, but percentage rather than absolute. Default 5. Raise with long overlaps. 
     -fastq_trunctail #, discards reads at the first base with a quality score <= #, default 2, higher often improves merging. Set it based on QC data from fastqc.
     -relabel ABC, for relabelling samples using something human-readable. The operator, @,  provides a nice default (-relabel @ ). It truncates at the first underscore adds a (.) to separate, and a number as read count.
 
@@ -82,41 +84,45 @@ DOC
 # Variables. Also be sure to check the id variable below. Default should work in most cases.
 MAXDIFFS=10    # Maximum differences to accept. Higher increases number of merges. Error rates will be taken care of in the filtering steps, so feel free to raise this.
 TRUNCTAIL=20  # Minimum quality score of a base at which to truncate. Higher increases merges (be reducing mismatches). Not necessarily good... watch mean expected errors and alignment length
-MERGED_OUT="PZM_TEST"
+MERGED_OUT="V1_PZM"
 
 # Make directories for your new, merged reads
 mkdir ./merged
 mkdir ./merged/stats
 
-usearch9 -fastq_mergepairs *_R1*.fastq \
+mkdir ./raw_reads
+mv *.fastq ./raw_reads
+
+usearch9 -fastq_mergepairs ./raw_reads/*_R1*.fastq \
   -fastqout ./merged/${MERGED_OUT}_merged.fastq \
   -relabel @ \
   -log ./merged/stats/${MERGED_OUT}_merge.log \
   -fastq_nostagger \
   -fastq_maxdiffs ${MAXDIFFS} \
-  -fastq_trunctail ${TRUNCTAIL} # the relabel flag changes fastq labels from jibberish to $id.readnumber
-
+  -fastq_trunctail ${TRUNCTAIL}
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 : <<DOC
-00:01 83Mb    100.0% 81.0% merged
+
+22 seconds for the entire process (~80 samples)
 
 Totals:
-     43259  Pairs (43.3k)
-     35035  Merged (35.0k, 80.99%)
-      2464  Alignments with zero diffs (5.70%)
-      7720  Too many diffs (> 10) (17.85%)
-      3260  Fwd tails Q <= 20 trimmed (7.54%)
-     35758  Rev tails Q <= 20 trimmed (82.66%)
-       482  No alignment found (1.11%)
+   2288752  Pairs (2.3M)
+   1849277  Merged (1.8M, 80.80%)
+    134561  Alignments with zero diffs (5.88%)
+    411467  Too many diffs (> 10) (17.98%)
+    250706  Fwd tails Q <= 20 trimmed (10.95%)
+   1529644  Rev tails Q <= 20 trimmed (66.83%)
+     26137  No alignment found (1.14%)
          0  Alignment too short (< 16) (0.00%)
-        22  Staggered pairs (0.05%) discarded
-    180.70  Mean alignment length
-    404.31  Mean merged length
-      0.52  Mean fwd expected errors
-      6.16  Mean rev expected errors
-      0.10  Mean merged expected errors  # awesome.
+      1871  Staggered pairs (0.08%) discarded
+    190.43  Mean alignment length
+    399.77  Mean merged length
+      0.85  Mean fwd expected errors
+      4.85  Mean rev expected errors
+      0.10  Mean merged expected errors
+
 
 DOC
 
@@ -154,7 +160,7 @@ usearch9 -fastx_truncate ./merged/${MERGED_OUT}_merged.fastq \
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 #
-# 00:01 37Mb    100.0% Processing, 0 (0.0%) too short
+# 00:13 37Mb    100.0% Processing, 0 (0.0%) too short
 #
 
 ######################################################################################################
@@ -200,11 +206,12 @@ usearch9 -fastq_filter ./merged/${MERGED_OUT}_trimmed.fastq\
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 : <<DOC
-# Example Output
-00:01 15Mb    100.0% Filtering, 99.3% passed
-     35035  Reads (35.0k)                   
-       232  Discarded reads with expected errs > 1.00
-     34803  Filtered reads (34.8k, 99.3%)
+
+00:21 108Mb   100.0% Filtering, 99.4% passed
+   1849277  Reads (1.8M)                    
+     10786  Discarded reads with expected errs > 1.00
+   1838491  Filtered reads (1.8M, 99.4%)
+
 DOC
 
 ######################################################################################################
@@ -241,17 +248,18 @@ usearch9 -fastx_uniques ./merged/${MERGED_OUT}_filtered.fasta \
 : <<DOC
 Sample Output:
 
-00:00 33Mb    100.0% DF                                        
-00:00 34Mb   34803 seqs, 3708 uniques, 2473 singletons (66.7%)
-00:00 34Mb   Min size 1, median 1, max 17529, avg 9.39
-00:00 33Mb    100.0% Writing ./filtered/PZM_TEST_uniques.fasta
+00:06 781Mb   100.0% Reading ./merged/V1_PZM_filtered.fasta
+00:08 1.2Gb   100.0% DF                                    
+00:10 1.2Gb  1838491 seqs, 107162 uniques, 80719 singletons (75.3%)
+00:10 1.2Gb  Min size 1, median 1, max 472506, avg 17.16
+00:11 928Mb   100.0% Writing ./merged/V1_PZM_uniques.fasta
 
 DOC
 
 ######################################################################################################
 ######################################################################################################
 ############                                                                      ####################
-############        DENOISING APPROACH 1: REMOVE MISTAKES, SPURRIOUS OTUs         ####################
+############                     DENOISING APPROACH 1: UNOISE                     ####################
 ############                                                                      ####################
 ######################################################################################################
 ######################################################################################################
@@ -351,8 +359,6 @@ DOC
 #variables for cluster_otus
 MINSIZE=2
 
-mkdir ./denoised
-
 usearch9 -cluster_otus ./merged/${MERGED_OUT}_uniques.fasta \
   -minsize ${MINSIZE} \
   -otus ./merged/${MERGED_OUT}_uparse_defaults.fasta \
@@ -361,7 +367,7 @@ usearch9 -cluster_otus ./merged/${MERGED_OUT}_uniques.fasta \
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 : <<DOC
 
-00:01 48Mb    100.0% 54 OTUs, 26 chimeras
+00:18 57Mb    100.0% 1402 OTUs, 518 chimeras
 
 DOC
 ######################################################################################################
@@ -383,17 +389,39 @@ without increasing error rates; to do this effectively would require mock datase
     only forward.
   -id [0, 1], matching OTUs. 97% (0.97) recommended.
   -rdpout PATH, for an output file in RDP format
+
+To set the cutoff, look at the estimated sensitivities and error rates for your database. Find this in the
+./reports directory (ex. if targeting ITS2 using the UNITE version from the utax website, see 
+./utaxref/unite_v7/reports/its2.txt). Based on where sensitivities stop rising quickly and error rates
+start rising quickly, and your tolerance for error, chose and appropriate sensitivity. Remember that the
+errors are mis-classification and might affect interpretation of community differences, but will not affect
+magnitudes of differences (by normal diversity metrics).
+
+more its2.txt ##BASH command to view easily
+            ___Phylum___    ___Class____    ___Order____    ___Family___    ___Genus____    __Species___
+  Cutoff    Sens     Err    Sens     Err    Sens     Err    Sens     Err    Sens     Err    Sens     Err
+  0.9500    60.7    5.96    46.6    3.98    45.7    1.52    49.7    1.02    59.6    1.29    41.9    0.56
+  0.9000    62.9   10.75    52.2    4.14    53.4    4.50    56.3    2.60    64.4    1.57    65.7    1.10
+  0.8000    63.6   10.97    61.8    6.60    58.8    6.71    62.9    4.91    73.3    2.76    84.6    1.92
+  0.7000    64.3   11.19    69.6   11.89    63.7   10.28    66.7    7.54    77.3    5.41    90.5    2.59 <-- LOOKS GOOD! (p<0.03)
+  0.6000    65.3   11.39    73.9   18.77    68.5   16.13    70.3   11.08    80.0    8.17    95.5    4.96 <-- LOOKS GOOD! (p<0.05)
+  0.5000    66.0   12.16    76.0   20.18    71.6   20.74    72.4   13.48    82.4   11.50    95.8    6.53
+  0.4000    66.9   13.53    76.7   23.94    74.1   24.56    74.8   17.15    84.7   15.41    96.1    8.31
+  0.3000    68.0   16.63    78.1   26.56    75.5   28.18    77.1   21.28    86.3   19.85    96.4   10.14
+  0.2000    69.8   22.63    79.4   27.79    77.3   34.60    79.0   25.81    87.8   24.38    96.7   12.67
+  0.1000    72.4   34.43    80.6   39.36    79.1   42.99    81.1   34.34    89.2   33.65    97.3   19.73
+  0.0000    76.2   61.92    82.3   58.86    80.8   59.59    84.2   57.89    90.7   54.66    97.8   51.11
 DOC
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 #variables for -utax
-CUTOFF=0.90 #0.9 default; recommended. 
+CUTOFF=0.7 #0.9 default; see report to set. 
 STRAND="both"
 MATCH_ID=0.97
 
-PATH_TO_DB=./UNITE/UNITEv7_its2_ref.udb
+PATH_TO_DB=../UNITE/UNITEv7_its2_ref.udb
 #PATH_TO_CLUSTERS=./denoised/unoise_defaults.fasta
-NAME_OUT=${MERGED_OUT}"_uparse_"${CUTOFF}  # string identifying the output .utax and .txt files
+NAME_OUT=${MERGED_OUT}"_uparse_cut"${CUTOFF}  # string identifying the output .utax and .txt files
 METHOD="uparse"
 
 usearch9 -utax ./merged/${MERGED_OUT}_${METHOD}_defaults.fasta \
@@ -407,6 +435,15 @@ usearch9 -utax ./merged/${MERGED_OUT}_${METHOD}_defaults.fasta \
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#  
 : <<DOC
 
+
+00:01 327Mb   100.0% 1402 seqs, 74.5% at phylum, 28.7% genus (P > 0.50)
+00:00 325Mb   100.0% 1402 seqs, 73.0% at phylum, 26.9% genus (P > 0.60) #both uparse
+00:01 325Mb   100.0% 1402 seqs, 72.5% at phylum, 24.4% genus (P > 0.70)
+00:01 326Mb   100.0% 1402 seqs, 72.5% at phylum, 21.9% genus (P > 0.75)
+00:01 326Mb   100.0% 1402 seqs, 71.7% at phylum, 17.4% genus (P > 0.80)
+00:04 325Mb   100.0% 1402 seqs, 70.9% at phylum, 9.1% genus (P > 0.90)
+
+# for comparing methods
 00:00 212Mb   100.0% 54 seqs, 64.8% at phylum, 9.3% genus (P > 0.90)  # uparse method
 00:00 212Mb   100.0% 93 seqs, 30.1% at phylum, 4.3% genus (P > 0.90)  # unoise method 
 
@@ -465,6 +502,6 @@ usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
   
 : <<DOC
-00:00 131Mb   100.0% Searching PZM_TEST_trimmed.fastq, 99.5% matched
+01:10 158Mb   100.0% Searching V1_PZM_trimmed.fastq, 99.4% matched
 
 DOC
