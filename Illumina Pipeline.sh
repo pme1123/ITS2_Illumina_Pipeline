@@ -44,13 +44,15 @@ THREADS=16  # 250mb each. Make sure you've checked out the resources for this fi
 cd ${WORKINGDIR}
 mkdir ${FASTQC_OUT}
 module load fastqc  # UMN MSI command
-fastqc *.fastq -o ${FASTQC_OUT} -t $THREADS #16 threads, 250mb RAM each. 
+fastqc *.fastq \
+  -o ${FASTQC_OUT} \
+  -t $THREADS
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 # Look at the html output using a web browser. Easiest is to ssh in your file manager. Open your file
 # manager and in the address bar, type:
-ssh://USER@login.msi.umn.edu/home/GROUP/USER/${WORKINGDIR}/${FASTQC_OUT}
+ssh://<username>@login.msi.umn.edu/home/<lab_group_name>/<username>/${WORKINGDIR}/${FASTQC_OUT}
 
 
 ######################################################################################################
@@ -82,15 +84,16 @@ DOC
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
-# Variables. Also be sure to check the id variable below. Default should work in most cases.
-MAXDIFFS=10    # Maximum differences to accept. Higher increases number of merges. Error rates will be taken care of in the filtering steps, so feel free to raise this.
-TRUNCTAIL=20  # Minimum quality score of a base at which to truncate. Higher increases merges (be reducing mismatches). Not necessarily good... watch mean expected errors and alignment length
+# Variables. Set parameters based on mean expected errors and expected overlap (alignment lengths). Don't worry too much about optimizing. 
+MAXDIFFS=10    # Maximum differences to accept. Higher increases number of merges. Error rates will be taken care of in the filtering steps, so feel free to raise this for long overlaps.
+TRUNCTAIL=20  # Minimum quality score of a base at which to truncate. Higher increases merges (be reducing mismatches). Not necessarily good.
 MERGED_OUT="V1_PZM"
 
-# Make directories for your new, merged reads
+# Make directories for new, merged reads
 mkdir ./merged
 mkdir ./merged/stats
 
+# move raw reads to a different directory for organization
 mkdir ./raw_reads
 mv *.fastq ./raw_reads
 
@@ -344,34 +347,34 @@ DOC
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
 
 #variables for -utax
-CUTOFF=0.7 #0.9 default; see report to set. 
+CUTOFF=0.7 #0.9 default; see report to set.
 STRAND="both"
 MATCH_ID=0.97
 
 PATH_TO_DB=../UNITE/UNITEv7_its2_ref.udb
-#PATH_TO_CLUSTERS=./denoised/unoise_defaults.fasta
 NAME_OUT=${MERGED_OUT}"_taxa_cut"${CUTOFF}  # string identifying the output .utax and .txt files
+
+mkdir ./OTUs
 
 usearch9 -utax ./merged/${MERGED_OUT}_clusters.fasta \
   -db ${PATH_TO_DB} \
   -strand ${STRAND} \
   -id ${MATCH_ID} \
   -utax_cutoff ${CUTOFF} \
-  -utaxout ./merged/${NAME_OUT}_OTUs.utax \
-  -alnout ./merged/${NAME_OUT}_alignment.txt
+  -utaxout ./OTUs/${NAME_OUT}_OTUs.utax \
+  -alnout ./OTUs/${NAME_OUT}_alignment.txt
   
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#  
 : <<DOC
 
-
 00:01 327Mb   100.0% 1402 seqs, 74.5% at phylum, 28.7% genus (P > 0.50)
-00:00 325Mb   100.0% 1402 seqs, 73.0% at phylum, 26.9% genus (P > 0.60) #both uparse
+00:00 325Mb   100.0% 1402 seqs, 73.0% at phylum, 26.9% genus (P > 0.60)
 00:01 325Mb   100.0% 1402 seqs, 72.5% at phylum, 24.4% genus (P > 0.70)
 00:01 326Mb   100.0% 1402 seqs, 72.5% at phylum, 21.9% genus (P > 0.75)
 00:01 326Mb   100.0% 1402 seqs, 71.7% at phylum, 17.4% genus (P > 0.80)
 00:04 325Mb   100.0% 1402 seqs, 70.9% at phylum, 9.1% genus (P > 0.90)
 
-# for comparing methods
+# for comparing UPARSE to UNOISE methods (single sample from this dataset)
 00:00 212Mb   100.0% 54 seqs, 64.8% at phylum, 9.3% genus (P > 0.90)  # uparse method
 00:00 212Mb   100.0% 93 seqs, 30.1% at phylum, 4.3% genus (P > 0.90)  # unoise method 
 
@@ -383,7 +386,6 @@ Overall, uparse matches a higher percentage but also has fewer OTUs:
   UPARSE has 54 OTUs
 Therefore, in terms of absolute matches, the methods are equivalent. Plus, regardless of cutoff or method,
 I find 9 matches to Glomeromycota
-
 DOC
 
 ######################################################################################################
@@ -415,17 +417,14 @@ STRAND="both"
 MATCH_ID=0.97
 
 PATH_TO_OTUS=./merged/${MERGED_OUT}_clusters.fasta  # from clustering OTUs (UNOISE or UPARSE)
-NAME_OUT="unoise${CUTOFF}"  # string identifying the output .utax and .txt files
-
-mkdir ./merged/OTU_TABLE
 
 usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
   -db ${PATH_TO_OTUS} \
   -strand ${STRAND} \
   -id ${MATCH_ID} \
-  -log ./merged/OTU_TABLE/${MERGED_OUT}_table_log.txt \
-  -otutabout ./merged/OTU_TABLE/${MERGED_OUT}_table.txt \
-  -biomout ./merged/OTU_TABLE/${MERGED_OUT}_table.json  # optional
+  -log ./OTUs/${MERGED_OUT}_OTUtable_log.txt \
+  -otutabout ./OTUs/${MERGED_OUT}_OTUtable.txt \
+  -biomout ./OTUs/${MERGED_OUT}_OTUtable.json  # optional output format
 
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#
   
@@ -433,3 +432,4 @@ usearch9 -usearch_global ./merged/${MERGED_OUT}_trimmed.fast* \
 01:10 158Mb   100.0% Searching V1_PZM_trimmed.fastq, 99.4% matched
 
 DOC
+

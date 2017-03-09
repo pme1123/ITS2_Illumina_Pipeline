@@ -38,7 +38,7 @@ rm utax*.tar.gz
 usearch9 -makeudb_utax "./utaxref/unite_v${VERSION}/fasta/refdb.fa" \
   -output "./UNITEv${VERSION}_${TARGET}_ref.udb" \
   -taxconfsin "./utaxref/unite_v${VERSION}/taxconfs/${TARGET}.tc" \
-  -report "./UNITEv${VERSION}_${TARGET}_report.txt"  # probably doesn't show anything useful for UNITE as input
+  -report "./UNITEv${VERSION}_${TARGET}_report.txt"  # use this to set parameters for clustering etc. 
 
 # return to working directory
 cd ..
@@ -60,3 +60,4 @@ Output:
 00:04 184Mb   100.0% Seqs
 
 DOC
+
