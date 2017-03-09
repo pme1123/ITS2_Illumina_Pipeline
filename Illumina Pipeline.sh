@@ -355,6 +355,7 @@ PATH_TO_DB=../UNITE/UNITEv7_its2_ref.udb
 NAME_OUT=${MERGED_OUT}"_taxa_cut"${CUTOFF}  # string identifying the output .utax and .txt files
 
 mkdir ./OTUs
+mkdir ./OTUs/alignments
 
 usearch9 -utax ./merged/${MERGED_OUT}_clusters.fasta \
   -db ${PATH_TO_DB} \
@@ -362,7 +363,7 @@ usearch9 -utax ./merged/${MERGED_OUT}_clusters.fasta \
   -id ${MATCH_ID} \
   -utax_cutoff ${CUTOFF} \
   -utaxout ./OTUs/${NAME_OUT}_OTUs.utax \
-  -alnout ./OTUs/${NAME_OUT}_alignment.txt
+  -alnout ./OTUs/alignments/${NAME_OUT}_alignment.txt
   
 #*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#**#*#*#*#*#*#  
 : <<DOC
